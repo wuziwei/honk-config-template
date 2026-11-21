@@ -1,0 +1,76 @@
+{
+  "version": 3,
+  "rules": [
+    {
+      "domain": [
+        "alibaba.cdn.steampipe.steamcontent.com",
+        "localhost",
+        "mesu.apple.com",
+        "swcdn.apple.com",
+        "swdist.apple.com",
+        "swdownload.apple.com",
+        "swscan.apple.com",
+        "time-ios.apple.com",
+        "time.apple.com",
+        "time.asia.apple.com"
+      ]
+    },
+    {
+      "domain_suffix": [
+        "direct",
+        "example",
+        "home.arpa",
+        "invalid",
+        "kk-rays.com",
+        "lan",
+        "local",
+        "localdomain",
+        "localhost",
+        "steamcontent.com",
+        "test"
+      ]
+    },
+    {
+      "domain_keyword": [
+        "ntp.org.cn",
+        "time.edu.cn"
+      ]
+    },
+    {
+      "domain_regex": [
+        "^DC\\._msDCS\\.[^.]+\\.[^.]+$",
+        "^GC\\._msDCS\\.[^.]+\\.[^.]+$",
+        "^PDC\\._msDCS\\.[^.]+\\.[^.]+$",
+        "^[^.]+\\.10099\\.com\\.cn$",
+        "^[^.]+\\.126\\.net$",
+        "^[^.]+\\.blzstatic\\.cn$",
+        "^[^.]+\\.cmpassport\\.com$",
+        "^[^.]+\\.direct$",
+        "^[^.]+\\.example$",
+        "^[^.]+\\.ff14\\.sdo\\.com$",
+        "^[^.]+\\.home\\.arpa$",
+        "^[^.]+\\.invalid$",
+        "^[^.]+\\.jegotrip\\.com\\.cn$",
+        "^[^.]+\\.kuwo\\.cn$",
+        "^[^.]+\\.lan$",
+        "^[^.]+\\.local$",
+        "^[^.]+\\.localdomain$",
+        "^[^.]+\\.localhost$",
+        "^[^.]+\\.mcdn\\.bilivideo\\.cn$",
+        "^[^.]+\\.microdone\\.cn$",
+        "^[^.]+\\.music\\.163\\.com$",
+        "^[^.]+\\.music\\.migu\\.cn$",
+        "^[^.]+\\.ntp\\.org\\.cn$",
+        "^[^.]+\\.pingan\\.com\\.cn$",
+        "^[^.]+\\.router\\.asus\\.com$",
+        "^[^.]+\\.test$",
+        "^[^.]+\\.time\\.edu\\.cn$",
+        "^[^.]+\\.wosms\\.cn$",
+        "^[^.]+\\.xiami\\.com$",
+        "^[^.]+\\.y\\.qq\\.com$",
+        "^localhost\\.[^.]+\\.weixin\\.qq\\.com$",
+        "^time\\.[^.]+\\.edu\\.cn$"
+      ]
+    }
+  ]
+}

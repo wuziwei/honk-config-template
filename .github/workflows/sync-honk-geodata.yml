@@ -1,0 +1,60 @@
+name: Sync Honk GeoData
+
+on:
+  schedule:
+    # 每天北京时间凌晨 04:30 自动执行一次
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build GeoData
+        run: |
+          python honk-rule/build_geodata.py
+
+      - name: Check for changes and commit
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add honk-rule/
+          if git diff --staged --quiet; then
+            echo "No changes detected in honk-rule artifacts."
+          else
+            git commit -m "chore(geodata): daily auto-sync geosite & geoip [skip ci]"
+            git push
+          fi
+
+      - name: Release Latest GeoData
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: geodata
+          name: "Latest Honk GeoData Suite"
+          body: |
+            ## 🌟 Honk Custom GeoData Suite (Latest Release)
+
+            - **Upstream Source**: `DustinWin/ruleset_geodata` (branch: `mihomo-geodata`)
+            - **Build Date**: ${{ github.event.head_commit.timestamp || github.sha }}
+            - **Included Files**:
+              - `geosite.dat` (Zero BT / P2P, Zero Duplicate Code, 29 categories)
+              - `geoip.dat` (Private, CN, Telegram, BlockHttpDNS, etc.)
+          files: |
+            honk-rule/geosite.dat
+            honk-rule/geosite.dat.sha256sum
+            honk-rule/geoip.dat
+            honk-rule/geoip.dat.sha256sum
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

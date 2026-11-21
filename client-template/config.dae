@@ -1,0 +1,291 @@
+# ===========================================================================
+# Honk (dae) OpenWrt 客户端生产级工程模板 (OpenWrt Client Template)
+# 
+# 项目地址: https://github.com/wuziwei/honk-config-template
+# 适用平台: OpenWrt 23.05+ / Linux 6.x (需内核开启 eBPF CO-RE 与 BTF)
+# 核心特性:
+#   1. 内核级 eBPF (TC / Netfilter) 线速分流，零拷贝、极低 CPU 负载
+#   2. 完美协同硬件加速（如 Airoha PPE / MediaTek WED / Broadcom FullCone 2）
+#   3. BT / PT / P2P 流量硬件级直通，杜绝机场封号与连接池膨胀
+#   4. DNS 零泄露保护 + 智能嗅探回源（防污染、防误杀、CDN 极速调度）
+#   5. WebRTC-STUN 与海外 QUIC 拦截，彻底根除真实公网 IP 泄露
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# 全局基础配置 (Global Settings)
+# ---------------------------------------------------------------------------
+global {
+    # WAN 接口设置（优先指定真实外网接口如 pppoe-wan / eth0，留空或 auto 为自动探测）
+    wan_interface: pppoe-wan, auto
+
+    # LAN 接口设置（OpenWrt 默认为 br-lan，支持逗号分隔多个物理或桥接网卡）
+    lan_interface: br-lan
+
+    # 日志输出级别：trace, debug, info, warn, error（生产环境建议使用 warn 以节省软路由 IO）
+    log_level: warn
+
+    # 拨号模式：domain++ 彻底豁免 fake-ip 校验，基于嗅探真实 SNI/Host 重新计算路由并以域名交付代理拨号
+    # （彻底根治 YouTube、Netflix、Instagram 因 IP 毒化或 GeoIP 漂移导致的卡顿、黑屏）
+    dial_mode: domain++
+
+    # 自动调优 Linux 内核参数（自动开启 bpf_jit、fq 队列及核心转发优化）
+    auto_config_kernel_parameter: true
+
+    # 启用 NFQUEUE 流量重定向能力
+    nfqueue_enable: true
+
+    # 运行时数据与 Geodata 持久化存储目录（OpenWrt sysupgrade 升级时自动保留）
+    data_dir: '/etc/honk/data'
+    log_file: ''
+
+    # 节点健康检查与连通性心跳参数
+    tcp_check_url: 'https://clients1.google.com/generate_204'
+    tcp_check_http_method: HEAD
+    check_interval: 180s
+    check_tolerance: 50ms
+    udp_check_dns: 'dns.google:53', '8.8.8.8', '2001:4860:4860::8888'
+
+    # 启动引导解析器（用于在代理建立前，直连解析节点域名与 DoH 基础设施 IP）
+    bootstrap_resolver: '223.5.5.5:53'
+
+    # TLS 协议栈混淆与浏览器指纹模拟
+    allow_insecure: false
+    tls_implementation: utls
+    utls_imitate: chrome_auto
+    preconnect_node_count: 'auto'
+    udp_warm_node_count: 1
+    sniffing_timeout: 100ms
+}
+
+# ---------------------------------------------------------------------------
+# 代理节点定义 (Node Definitions)
+# 支持协议: Hysteria 2, VLESS, Shadowsocks (2022), Trojan, TUIC v5, SOCKS5 等
+# ---------------------------------------------------------------------------
+node {
+    # --- [示例 1] Hysteria 2 (UDP 协议狂飙，支持多端口跳跃与 Salamander 混淆) ---
+    'HK-Hy2-01': 'hysteria2://<YOUR_PASSWORD>@<HK_SERVER_IP_OR_DOMAIN>:2053?sni=<YOUR_SNI_DOMAIN>&obfs=salamander&obfs-password=<YOUR_OBFS_PWD>&mport=20000-50000&insecure=0#downmbps=500&upmbps=50'
+    'JP-Hy2-01': 'hysteria2://<YOUR_PASSWORD>@<JP_SERVER_IP_OR_DOMAIN>:2053?sni=<YOUR_SNI_DOMAIN>&obfs=salamander&obfs-password=<YOUR_OBFS_PWD>&mport=20000-50000&insecure=0#downmbps=500&upmbps=50'
+    'US-Hy2-01': 'hysteria2://<YOUR_PASSWORD>@<US_SERVER_IP_OR_DOMAIN>:2053?sni=<YOUR_SNI_DOMAIN>&obfs=salamander&obfs-password=<YOUR_OBFS_PWD>&mport=20000-50000&insecure=0#downmbps=500&upmbps=50'
+    'SG-Hy2-01': 'hysteria2://<YOUR_PASSWORD>@<SG_SERVER_IP_OR_DOMAIN>:2053?sni=<YOUR_SNI_DOMAIN>&obfs=salamander&obfs-password=<YOUR_OBFS_PWD>&mport=20000-50000&insecure=0#downmbps=500&upmbps=50'
+
+    # --- [示例 2] VLESS Reality (基于 TLS 1.3 偷取大厂证书，抗封锁利器) ---
+    # 'JP-Vless-Reality': 'vless://<UUID>@<JP_SERVER_IP>:443?encryption=none&security=reality&sni=www.apple.com&fp=chrome&pbk=<PUBLIC_KEY>&sid=<SHORT_ID>&type=tcp'
+
+    # --- [示例 3] Shadowsocks 2022 (极简高效，软路由跑满千兆) ---
+    # 'HK-SS-2022': 'ss://2022-blake3-aes-128-gcm:<PASSWORD>@<HK_SERVER_IP>:8388'
+
+    # --- [示例 4] Trojan (TLS 标准加密) ---
+    # 'SG-Trojan': 'trojan://<PASSWORD>@<SG_SERVER_IP>:443?sni=<YOUR_SNI_DOMAIN>'
+}
+
+# ---------------------------------------------------------------------------
+# 出站策略组 (Group Policies)
+# 策略类型:
+#   - min_moving_avg: 滑动平均最低延迟（最平滑稳定，推荐）
+#   - min_rtt: 即时最低延迟
+#   - random: 随机轮询分流
+#   - fallback: 主备降级容灾
+# ---------------------------------------------------------------------------
+group {
+    # 延迟优选主组（基于正则自动匹配低延迟亚太/欧美节点）
+    latency {
+        filter: name(regex: '^(HK|JP|SG|US)-Hy2')
+        policy: min_moving_avg
+        tolerance: 50
+        idle_timeout: 900
+        check_url: 'https://clients1.google.com/generate_204'
+    }
+
+    # 通用代理出站组（默认代理池）
+    proxy {
+        filter: name(regex: '^(HK|JP|SG|US)')
+        policy: min_moving_avg
+        tolerance: 50
+        idle_timeout: 900
+        check_url: 'https://clients1.google.com/generate_204'
+    }
+
+    # Google 专属分流组（YouTube / Google 搜索 / Gmail / Gemini）
+    google {
+        filter: name(regex: '^(HK|JP|SG|US)')
+        policy: min_moving_avg
+        tolerance: 50
+        check_url: 'https://www.google.com/generate_204'
+    }
+
+    # Meta / Facebook / Instagram / WhatsApp 专属分流组
+    meta {
+        filter: name(regex: '^(HK|JP|SG|US)')
+        policy: min_moving_avg
+        tolerance: 50
+        check_url: 'https://www.facebook.com'
+    }
+
+    # Netflix / Disney+ 流媒体解锁组
+    netflix {
+        filter: name(regex: '^(SG|HK|JP|US)')
+        policy: min_moving_avg
+        tolerance: 50
+        check_url: 'https://www.netflix.com/title/80018499'
+    }
+
+    # Spotify 音乐流媒体解锁组
+    spotify {
+        filter: name(regex: '^(HK|JP|SG|US)')
+        policy: min_moving_avg
+        tolerance: 50
+        check_url: 'https://www.spotify.com'
+    }
+
+    # 兜底组（未命中上述业务分组时的最终出站）
+    final {
+        filter: name(regex: '.*')
+        policy: min_moving_avg
+        tolerance: 50
+    }
+}
+
+# ---------------------------------------------------------------------------
+# DNS 分流与零污染解析 (DNS Subsystem)
+# ---------------------------------------------------------------------------
+dns {
+    # 本地监听地址（配合 dnsmasq 将软路由 DNS 指向此处）
+    bind: 'tcp+udp://127.0.0.1:5353'
+    use_host: true
+    client_subnet: '223.5.5.0/24'
+    optimistic_cache: true
+    optimistic_cache_ttl: 600
+    max_cache_size: 4096
+
+    upstream {
+        # 国内直连高速 DNS (阿里 DNS DoH，直连放行无污染)
+        alidns: 'https://dns.alidns.com/dns-query' -> direct
+        # 海外防污染安全 DNS (Google DNS DoH，经由代理链路安全转发)
+        googledns: 'https://dns.google/dns-query' -> proxy
+    }
+
+    routing {
+        request {
+            # 阻断广告、公共 HttpDNS 以及 Apple DoH Canary 探测
+            qname(geosite: ads, geosite: blockhttpdns, geosite: doh-canary) -> reject
+            # 屏蔽无用查询类型，显著减少无线广播风暴与空口 RTT 延迟
+            qtype(https, svcb, ptr, any) -> reject
+            # 阻断 WebRTC STUN 探测，杜绝浏览器通过 UDP 打洞泄露真实家庭出口公网 IP
+            qname(geosite: webrtc-stun) -> reject
+
+            # --- 自定义私有域名与 DDNS 直连白名单（根据需要替换或取消注释）---
+            # qname(suffix: 'your-custom-domain.com', suffix: 'your-ddns.org') -> alidns
+
+            # 大陆白名单直连解析（Apple/微软大陆 CDN、国服游戏与国内主流网站秒级解析）
+            qname(geosite: private, geosite: cn, geosite: apple-cn, geosite: microsoft-cn, geosite: games-cn) -> alidns
+
+            # 海外专属业务流媒体分流解析
+            qname(geosite: youtube, geosite: netflix, geosite: google, geosite: meta, geosite: spotify, geosite: proxy) -> googledns
+
+            # 兜底查询：默认交由 Google DoH 经代理安全解析，彻底杜绝 DNS 劫持与投毒
+            fallback: googledns
+        }
+
+        # --- 小众域名防误杀（DNS 二次智能嗅探：若海外 DNS 解析出国内 IP，自动重查阿里 DNS 提取最佳就近 CDN）---
+        response {
+            upstream(googledns) && ip(geoip: cn) -> alidns
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 内核级 eBPF 路由分流规则 (Kernel TC Hook Routing)
+# ---------------------------------------------------------------------------
+routing {
+    # --- 基础网络保护与内网直通 ---
+    dip(0.0.0.0/8) -> block(must)
+    dip(192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12) && !dport(53) -> direct(must)
+    dip(geoip: private) && !dport(53) -> direct(must)
+
+    # --- DNS 零泄露铁闸 ---
+    dport(53) -> direct
+    dport(853) -> block(must)
+
+    # --- BT / PT / P2P 下载双向直连铁闸（eBPF 零开销线速直通，协同驱动硬件 PPE 满血卸载，杜绝机场封号）---
+    dport(6881-6889, 51413, 16881-16889, 58595) -> direct(must)
+    sport(6881-6889, 51413, 16881-16889, 58595) -> direct(must)
+
+    # --- 局域网组播与多播发现直连（mDNS / SSDP / LLMNR / DLNA）---
+    dip(224.0.0.0/4, 'ff00::/8') -> direct(must)
+
+    # --- Windows NetBIOS / SMB / Samba 出境敏感端口阻断（防止公网窃取内网 NTLM 凭据）---
+    dport(137, 138, 139, 445) -> block(must)
+
+    # --- Tailscale / WireGuard 虚拟内网直通 ---
+    dip(100.64.0.0/10, 'fd7a:115c:a1e0::/48') -> direct(must)
+
+    # --- 广告、HttpDNS（41 段公网已知嗅探 IP）与私密转送拦截 ---
+    dip(geoip: blockhttpdns) -> block(must)
+    domain(geosite: ads, geosite: blockhttpdns, geosite: doh-canary) -> block
+    dport(993) && dip(geoip: cn) -> block
+
+    # --- 自定义直连域名直连放行（根据实际需求配置）---
+    # domain(regex: '(^|\.)(your-domain\.com)$') -> direct(must)
+
+    # --- 本地服务端口入站回包保底直连（防止公网 IPv6/DDNS 入站流量被非对称代理导致连不上）---
+    sport(22, 80, 443, 9090, 9092) -> direct(must)
+
+    # --- NTP 时钟校准：国内与局域网直连，海外经由代理防探测真实出口 IP ---
+    dport(123) && dip(geoip: private, geoip: cn) -> direct(must)
+    dport(123) -> proxy
+
+    # --- 国内网络直连旁路（内核 eBPF 线速直通，置于海外 QUIC / WebRTC 阻断之前）---
+    !dport(53, 853) && dip(geoip: private, geoip: cn) -> direct(must)
+    domain(geosite: private, geosite: cn, geosite: apple-cn, geosite: microsoft-cn, geosite: games-cn) -> direct(must)
+
+    # --- 海外 QUIC 与 WebRTC 阻断（国内已由上方直连，海外强制回退 TCP 走代理，杜绝真实 IP 泄露）---
+    l4proto(udp) && dport(443) -> block
+    dport(3478, 3479, 5349, 5350, 19302-19309) -> block(must)
+    domain(geosite: webrtc-stun) -> block
+
+    # --- 海外 ICMP / Ping 探测防泄露（防止通过 ping 海外服务器直连泄露真实公网出口）---
+    l4proto(icmp, icmp6) && !dip(geoip: private, geoip: cn) -> block(must)
+
+    # --- 专属业务与定制规则集分流 ---
+    domain(geosite: youtube, geosite: netflix) -> netflix
+    domain(geosite: google) -> google
+    domain(geosite: meta) -> meta
+    domain(geosite: spotify) -> spotify
+    dip(geoip: telegram) -> proxy
+    domain(geosite: proxy) -> proxy
+
+    # --- 纯公网 IP 大吞吐与非标准端口保底直连（保护代理节点连接池与软路由 CPU 负载）---
+    !dport(80, 443, 853) && !sport(80, 443, 853) -> direct(must)
+
+    # --- 最终兜底：未命中上述规则的海外流量默认交付 final 组代理 ---
+    fallback: final
+}
+
+# ---------------------------------------------------------------------------
+# 规则集与资源配置 (Assets)
+# ---------------------------------------------------------------------------
+assets {
+    route: direct
+    geodata {
+        # 官方 GitHub Raw 订阅源
+        geosite: 'https://raw.githubusercontent.com/wuziwei/honk-config-template/main/honk-rule/geosite.dat'
+        geoip: 'https://raw.githubusercontent.com/wuziwei/honk-config-template/main/honk-rule/geoip.dat'
+
+        # 国内免翻加速源（备用，适合国内无代理软路由环境直接拉取）
+        # geosite: 'https://ghfast.top/https://raw.githubusercontent.com/wuziwei/honk-config-template/main/honk-rule/geosite.dat'
+        # geoip: 'https://ghfast.top/https://raw.githubusercontent.com/wuziwei/honk-config-template/main/honk-rule/geoip.dat'
+
+        route: direct
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 扩展功能与 Clash 兼容 API (Experimental & Clash API)
+# ---------------------------------------------------------------------------
+experimental {
+    clash_api {
+        external_controller: '[::]:9090'
+        secret: '<YOUR_DASHBOARD_SECRET>'
+        default_mode: rule
+    }
+}
