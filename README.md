@@ -7,9 +7,11 @@
 ## 🌟 核心特性
 
 - **eBPF 内核级分流**：采用 TC / Netfilter Hook，零拷贝无损转发，极大降低软路由 CPU 负载。
-- **硬件卸载协同**：天然适配 Airoha PPE、MediaTek WED 等硬件加速，内网与直连流量线速转发。
+- **硬件卸载协同 (PPE / WED)**：天然适配 Airoha PPE、MediaTek WED 等硬件加速，内网与直连流量线速转发（突破软转发单核瓶颈）。
+- **DoH 纯 TCP (ARM-TCP) 安全分流**：海外 DNS 解析强制经由 VLESS-Reality / AnyTLS 等纯 TCP 隧道转发，彻底免受运营商 UDP QoS 丢包与握手超时影响。
+- **Airoha AN7581 硬件加速缺陷根治**：首创针对 PPPoE IPv6 硬件校验和缺陷的第一性原理修复方案（IPv4 满血硬件 PPE 卸载 + IPv6 内核软转发）。
+- **一键切换与软中断调优**：提供 `sb-honk` 生产级控制工具，无缝在 Sing-Box（裸核）与 Honk 间秒级切换，自动调控 CPU 调频与多队列 RPS/RFS 软中断分流。
 - **BT / P2P 零污染直通**：内置精准双向直通规则，彻底剥离 BT 分类，防封号、防连接池膨胀。
-- **智能 DNS 调度**：国内阿里 DoH 直连与海外安全 DoH 分流，结合二次嗅探机制避免 CDN 调度偏差。
 - **敏感信息完全脱敏**：无任何私人节点、密钥与私有域名，提供清晰的协议配置示例。
 - **全自动 GeoData 构建**：集成 GitHub Actions 每日自动构建最新 `geosite.dat` 与 `geoip.dat`。
 
@@ -19,9 +21,13 @@
 
 ```text
 ├── client-template/
-│   ├── config.dae            # OpenWrt 客户端脱敏配置模板
-│   ├── install.sh            # 一键安装与环境部署脚本
+│   ├── config.dae            # OpenWrt 客户端脱敏配置模板 (含 arm-tcp 与 score 策略)
+│   ├── install.sh            # 一键安装与环境部署脚本 (集成 jsDelivr 加速)
 │   └── update-geodata.sh     # 规则集原子热更新脚本
+├── scripts/
+│   ├── sb-honk               # Ponwrt / OpenWrt 核心管理与秒级切换控制工具
+│   ├── honk-ppe-gate.sh      # Honk 与硬件加速 (PPE/WED) 动态协同门控脚本
+│   └── patch-ppe-ruleset.sh  # Airoha AN7581 硬件加速 IPv6 校验和缺陷根治补丁
 ├── honk-rule/
 │   ├── build_geodata.py      # 纯 Python 标准库 GeoData 规则构建器
 │   ├── custom/               # 自定义分流规则定义 (JSON)
@@ -53,9 +59,25 @@ curl -fsSL https://raw.githubusercontent.com/wuziwei/honk-config-template/main/h
 curl -fsSL https://raw.githubusercontent.com/wuziwei/honk-config-template/main/honk-rule/geoip.dat -o /etc/honk/data/geoip.dat
 ```
 
-*(国内无代理环境可在 GitHub 链接前添加加速前缀 `https://ghfast.top/`)*
+*(国内无代理环境推荐使用 jsDelivr 加速源，例如 `https://cdn.jsdelivr.net/gh/wuziwei/honk-config-template@main/`)*
 
-### 2. 配置节点信息
+### 2. 部署核心控制与硬件加速补丁 (Ponwrt / Airoha AN7581 用户推荐)
+```sh
+# 下载核心切换控制工具
+curl -fsSL https://cdn.jsdelivr.net/gh/wuziwei/honk-config-template@main/scripts/sb-honk -o /usr/bin/sb-honk
+chmod +x /usr/bin/sb-honk
+
+# 下载 PPE 协同门控脚本
+mkdir -p /usr/libexec
+curl -fsSL https://cdn.jsdelivr.net/gh/wuziwei/honk-config-template@main/scripts/honk-ppe-gate.sh -o /usr/libexec/honk-ppe-gate.sh
+chmod +x /usr/libexec/honk-ppe-gate.sh
+
+# 若使用 Airoha AN7581 芯片且开启了硬件流分流，运行补丁修复 IPv6 校验和缺陷
+curl -fsSL https://cdn.jsdelivr.net/gh/wuziwei/honk-config-template@main/scripts/patch-ppe-ruleset.sh -o /tmp/patch-ppe-ruleset.sh
+sh /tmp/patch-ppe-ruleset.sh
+```
+
+### 3. 配置节点信息
 使用文本编辑器修改 `/etc/honk/config.dae` 中的 `node` 段落，填入您的真实节点信息：
 
 ```dae
@@ -65,12 +87,13 @@ node {
 }
 ```
 
-### 3. 启动与管理服务
+### 4. 启动与管理服务
 ```sh
-# 语法检查与启动
-/etc/init.d/honk start
+# 推荐使用 sb-honk 一键启动 (自动调控硬件 PPE、多核 RPS/RFS 及 DNS 零泄露)
+sb-honk honk
 
-# 查看运行状态
+# 或使用标准 init 脚本启动
+/etc/init.d/honk start
 /etc/init.d/honk status
 ```
 
@@ -90,6 +113,16 @@ node {
 ```
 
 ---
+
+## 🙏 鸣谢与致谢 (Acknowledgments)
+
+本项目规则集、分流策略与配置模板的实现离不开开源社区的杰出贡献，特别鸣谢以下上游项目与数据源：
+
+- [daeuniverse/dae](https://github.com/daeuniverse/dae) & [honk](https://github.com/daeuniverse/honk) - 革命性的基于 Linux eBPF 的高性能透明代理内核与架构灵感。
+- [DustinWin/ruleset_geodata](https://github.com/DustinWin/ruleset_geodata) - 优质的上游 GeoData 基础规则集数据源（`mihomo-geodata` 分支）。
+- [senshinya/singbox_ruleset](https://github.com/senshinya/singbox_ruleset) - 精准高效的 `BlockHttpDNS` 防嗅探与私密加固规则源。
+- [MetaCubeX/meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) & [v2fly/domain-list-community](https://github.com/v2fly/domain-list-community) - 社区经典的域名与 IP 分流分类标准生态。
+- [OpenWrt](https://openwrt.org) - 稳定强大的嵌入式 Linux 软路由操作系统与生态基石。
 
 ## 📄 开源许可证
 

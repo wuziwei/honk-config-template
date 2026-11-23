@@ -12,28 +12,29 @@ GEOSITE_URL="https://raw.githubusercontent.com/wuziwei/honk-config-template/main
 GEOIP_URL="https://raw.githubusercontent.com/wuziwei/honk-config-template/main/honk-rule/geoip.dat"
 GEOSITE_SHA="https://raw.githubusercontent.com/wuziwei/honk-config-template/main/honk-rule/geosite.dat.sha256sum"
 GEOIP_SHA="https://raw.githubusercontent.com/wuziwei/honk-config-template/main/honk-rule/geoip.dat.sha256sum"
-MIRROR_PREFIX="https://ghfast.top/"
+MIRROR_PREFIX="https://cdn.jsdelivr.net/gh/wuziwei/honk-config-template@main/honk-rule/"
 
 mkdir -p "$TMP_DIR"
 mkdir -p "$DATA_DIR"
 
 download_with_fallback() {
-    local url="$1"
-    local output="$2"
-    if ! curl -fsSL --connect-timeout 8 "$url" -o "$output" 2>/dev/null; then
-        curl -fsSL "$MIRROR_PREFIX$url" -o "$output"
+    local file_name="$1"
+    local raw_url="$2"
+    local output="$3"
+    if ! curl -fsSL --connect-timeout 8 "${MIRROR_PREFIX}${file_name}" -o "$output" 2>/dev/null; then
+        curl -fsSL "$raw_url" -o "$output"
     fi
 }
 
 echo "[*] 正在下载最新 GeoData 规则集校验和..."
-download_with_fallback "$GEOSITE_SHA" "$TMP_DIR/geosite.dat.sha256sum"
-download_with_fallback "$GEOIP_SHA" "$TMP_DIR/geoip.dat.sha256sum"
+download_with_fallback "geosite.dat.sha256sum" "$GEOSITE_SHA" "$TMP_DIR/geosite.dat.sha256sum"
+download_with_fallback "geoip.dat.sha256sum" "$GEOIP_SHA" "$TMP_DIR/geoip.dat.sha256sum"
 
 echo "[*] 正在下载最新 geosite.dat..."
-download_with_fallback "$GEOSITE_URL" "$TMP_DIR/geosite.dat"
+download_with_fallback "geosite.dat" "$GEOSITE_URL" "$TMP_DIR/geosite.dat"
 
 echo "[*] 正在下载最新 geoip.dat..."
-download_with_fallback "$GEOIP_URL" "$TMP_DIR/geoip.dat"
+download_with_fallback "geoip.dat" "$GEOIP_URL" "$TMP_DIR/geoip.dat"
 
 # 校验 SHA256 确保完整性
 echo "[*] 正在校验 SHA256 哈希..."

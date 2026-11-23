@@ -43,17 +43,17 @@ fi
 echo -e "${BLUE}[+] 下载精简优化的 geosite.dat 与 geoip.dat...${NC}"
 GEOSITE_URL="https://raw.githubusercontent.com/wuziwei/honk-config-template/main/honk-rule/geosite.dat"
 GEOIP_URL="https://raw.githubusercontent.com/wuziwei/honk-config-template/main/honk-rule/geoip.dat"
-MIRROR_PREFIX="https://ghfast.top/"
+MIRROR_PREFIX="https://cdn.jsdelivr.net/gh/wuziwei/honk-config-template@main/honk-rule/"
 
-# 优先尝试直连，失败回退到加速镜像
-if ! curl -fsSL --connect-timeout 5 "$GEOSITE_URL" -o /etc/honk/data/geosite.dat 2>/dev/null; then
-    echo -e "${YELLOW}[!] GitHub 直连超时，尝试使用加速镜像下载 geosite.dat...${NC}"
-    curl -fsSL "$MIRROR_PREFIX$GEOSITE_URL" -o /etc/honk/data/geosite.dat
+# 优先尝试 jsDelivr 镜像，失败回退到 GitHub 直连
+if ! curl -fsSL --connect-timeout 5 "${MIRROR_PREFIX}geosite.dat" -o /etc/honk/data/geosite.dat 2>/dev/null; then
+    echo -e "${YELLOW}[!] jsDelivr 镜像超时，尝试直连 GitHub 下载 geosite.dat...${NC}"
+    curl -fsSL "$GEOSITE_URL" -o /etc/honk/data/geosite.dat
 fi
 
-if ! curl -fsSL --connect-timeout 5 "$GEOIP_URL" -o /etc/honk/data/geoip.dat 2>/dev/null; then
-    echo -e "${YELLOW}[!] GitHub 直连超时，尝试使用加速镜像下载 geoip.dat...${NC}"
-    curl -fsSL "$MIRROR_PREFIX$GEOIP_URL" -o /etc/honk/data/geoip.dat
+if ! curl -fsSL --connect-timeout 5 "${MIRROR_PREFIX}geoip.dat" -o /etc/honk/data/geoip.dat 2>/dev/null; then
+    echo -e "${YELLOW}[!] jsDelivr 镜像超时，尝试直连 GitHub 下载 geoip.dat...${NC}"
+    curl -fsSL "$GEOIP_URL" -o /etc/honk/data/geoip.dat
 fi
 
 echo -e "${GREEN}[✓] 规则集部署完成 ($(ls -lh /etc/honk/data/geosite.dat | awk '{print $5}'), $(ls -lh /etc/honk/data/geoip.dat | awk '{print $5}'))${NC}"
