@@ -62,24 +62,13 @@ global {
 # 支持协议: Hysteria 2, VLESS, Shadowsocks (2022), Trojan, TUIC v5, SOCKS5 等
 # ---------------------------------------------------------------------------
 node {
-    # --- [示例 1] Hysteria 2 (UDP 协议狂飙，支持多端口跳跃与 Salamander 混淆) ---
-    'HK-Hy2-01': 'hysteria2://<YOUR_PASSWORD>@<HK_SERVER_IP_OR_DOMAIN>:2053?sni=<YOUR_SNI_DOMAIN>&obfs=salamander&obfs-password=<YOUR_OBFS_PWD>&mport=20000-50000&insecure=0#downmbps=500&upmbps=50'
-    'JP-Hy2-01': 'hysteria2://<YOUR_PASSWORD>@<JP_SERVER_IP_OR_DOMAIN>:2053?sni=<YOUR_SNI_DOMAIN>&obfs=salamander&obfs-password=<YOUR_OBFS_PWD>&mport=20000-50000&insecure=0#downmbps=500&upmbps=50'
-    'US-Hy2-01': 'hysteria2://<YOUR_PASSWORD>@<US_SERVER_IP_OR_DOMAIN>:2053?sni=<YOUR_SNI_DOMAIN>&obfs=salamander&obfs-password=<YOUR_OBFS_PWD>&mport=20000-50000&insecure=0#downmbps=500&upmbps=50'
-    'SG-Hy2-01': 'hysteria2://<YOUR_PASSWORD>@<SG_SERVER_IP_OR_DOMAIN>:2053?sni=<YOUR_SNI_DOMAIN>&obfs=salamander&obfs-password=<YOUR_OBFS_PWD>&mport=20000-50000&insecure=0#downmbps=500&upmbps=50'
-
-    # --- [示例 2] VLESS Reality (基于 TLS 1.3 偷取大厂证书，抗封锁利器，推荐用于 arm-tcp 分组) ---
-    'JP-Vless-01': 'vless://<UUID>@<JP_SERVER_IP>:443?encryption=none&security=reality&sni=www.apple.com&fp=chrome&pbk=<PUBLIC_KEY>&sid=<SHORT_ID>&type=tcp'
-    'US-Vless-01': 'vless://<UUID>@<US_SERVER_IP>:443?encryption=none&security=reality&sni=www.apple.com&fp=chrome&pbk=<PUBLIC_KEY>&sid=<SHORT_ID>&type=tcp'
-
-    # --- [示例 3] AnyTLS (纯 TCP 伪装流量) ---
-    'US-AnyTLS-01': 'anytls://<PASSWORD>@<US_SERVER_IP>:8443?sni=<YOUR_SNI_DOMAIN>&insecure=0'
-
-    # --- [示例 4] Shadowsocks 2022 (极简高效，软路由跑满千兆) ---
-    # 'HK-SS-2022': 'ss://2022-blake3-aes-128-gcm:<PASSWORD>@<HK_SERVER_IP>:8388'
-
-    # --- [示例 5] Trojan (TLS 标准加密) ---
-    # 'SG-Trojan': 'trojan://<PASSWORD>@<SG_SERVER_IP>:443?sni=<YOUR_SNI_DOMAIN>'
+    # -----------------------------------------------------------------------
+    # [安全提示] 本模板默认不预设任何实际节点或订阅链接，彻底杜绝隐私泄露。
+    # 请在下方填入您的真实节点信息，协议格式参考如下：
+    # -----------------------------------------------------------------------
+    # 'HK-Hy2-01': 'hysteria2://<PASSWORD>@<SERVER_IP>:2053?sni=<SNI>&obfs=salamander&obfs-password=<OBFS_PWD>&mport=20000-50000#downmbps=500&upmbps=50'
+    # 'JP-Vless-01': 'vless://<UUID>@<SERVER_IP>:443?encryption=none&security=reality&sni=www.apple.com&fp=chrome&pbk=<PUBLIC_KEY>&sid=<SHORT_ID>&type=tcp'
+    # 'US-AnyTLS-01': 'anytls://<PASSWORD>@<SERVER_IP>:8443?sni=<SNI>&insecure=0'
 }
 
 # ---------------------------------------------------------------------------
