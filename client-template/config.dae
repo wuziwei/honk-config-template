@@ -46,7 +46,7 @@ global {
     udp_check_dns: 'dns.google:53', '8.8.8.8', '2001:4860:4860::8888'
 
     # 启动引导解析器（用于在代理建立前，直连解析节点域名与 DoH 基础设施 IP）
-    bootstrap_resolver: '223.5.5.5:53'
+    bootstrap_resolver: '223.5.5.5:53', '119.29.29.29:53', '[2400:3200::1]:53', '[2402:4e00::]:53'
 
     # TLS 协议栈混淆与浏览器指纹模拟
     allow_insecure: false
@@ -220,8 +220,10 @@ routing {
     # --- Windows NetBIOS / SMB / Samba 出境敏感端口阻断（防止公网窃取内网 NTLM 凭据）---
     dport(137, 138, 139, 445) -> block(must)
 
-    # --- Tailscale / WireGuard 虚拟内网直通 ---
+    # --- Tailscale / WireGuard 虚拟内网直通与 STUN 协商端口直连 ---
     dip(100.64.0.0/10, 'fd7a:115c:a1e0::/48') -> direct(must)
+    dport(41641) -> direct(must)
+    sport(41641) -> direct(must)
 
     # --- 广告、HttpDNS（41 段公网已知嗅探 IP）与私密转送拦截 ---
     dip(geoip: blockhttpdns) -> block(must)
