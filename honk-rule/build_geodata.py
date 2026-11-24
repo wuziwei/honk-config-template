@@ -33,6 +33,13 @@ BLOCKHTTPDNS_REMOTE_URL = (
     "https://raw.githubusercontent.com/senshinya/singbox_ruleset/main/rule/BlockHttpDNS/BlockHttpDNS.json"
 )
 
+ADBLOCK_REMOTE_URL = (
+    "https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblocksingboxlite.json"
+)
+ADBLOCK_DAT_REMOTE_URL = (
+    "https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockv2raylite.dat"
+)
+
 EXCLUDED_UPSTREAM_GEOSITE_CODES = {
     "TRACKERSLIST",
     "BITTORRENT",
@@ -43,6 +50,7 @@ EXCLUDED_UPSTREAM_GEOSITE_CODES = {
 
 EXPECTED_GEOSITE_TAGS = [
     "ADS",
+    "ADLITE",
     "PRIVATE",
     "CN",
     "APPLE-CN",
@@ -219,6 +227,60 @@ def load_singbox_rule_json(file_path: str) -> Tuple[List[Tuple[int, str]], List[
     return domains, cidrs
 
 
+def load_geosite_dat_domains(file_path: str, target_tag: str = "") -> List[Tuple[int, str]]:
+    with open(file_path, "rb") as f:
+        data = f.read()
+    entries = parse_upstream_entries(data)
+    if not entries:
+        return []
+
+    inner_bytes = None
+    if target_tag and target_tag.upper() in entries:
+        inner_bytes = entries[target_tag.upper()]
+    else:
+        inner_bytes = next(iter(entries.values()))
+
+    domains: List[Tuple[int, str]] = []
+    ipos = 0
+    while ipos < len(inner_bytes):
+        itag, ipos = decode_varint(inner_bytes, ipos)
+        field = itag >> 3
+        wire = itag & 7
+        if field == 2 and wire == 2:
+            dlen, ipos = decode_varint(inner_bytes, ipos)
+            dbytes = inner_bytes[ipos : ipos + dlen]
+            ipos += dlen
+            dpos = 0
+            dtype = 0
+            dval = ""
+            while dpos < len(dbytes):
+                dtag, dpos = decode_varint(dbytes, dpos)
+                dfield = dtag >> 3
+                dwire = dtag & 7
+                if dfield == 1 and dwire == 0:
+                    dtype, dpos = decode_varint(dbytes, dpos)
+                elif dfield == 2 and dwire == 2:
+                    vlen, dpos = decode_varint(dbytes, dpos)
+                    dval = dbytes[dpos : dpos + vlen].decode("utf-8", errors="ignore")
+                    dpos += vlen
+                elif dwire == 0:
+                    _, dpos = decode_varint(dbytes, dpos)
+                elif dwire == 2:
+                    vl, dpos = decode_varint(dbytes, dpos)
+                    dpos += vl
+                else:
+                    break
+            domains.append((dtype, dval))
+        elif wire == 0:
+            _, ipos = decode_varint(inner_bytes, ipos)
+        elif wire == 2:
+            slen, ipos = decode_varint(inner_bytes, ipos)
+            ipos += slen
+        else:
+            break
+    return domains
+
+
 # ---------------------------------------------------------------------------
 # Main Build Pipeline
 # ---------------------------------------------------------------------------
@@ -248,8 +310,10 @@ def build_geodata(base_dir: str, offline: bool = False) -> None:
     rules_dir = os.path.normpath(os.path.join(base_dir, "..", "rules"))
     os.makedirs(custom_dir, exist_ok=True)
 
-    # 1. Update BlockHttpDNS rule if online
+    # 1. Update BlockHttpDNS & Adblock Lite rule if online
     blockhttpdns_path = os.path.join(custom_dir, "blockhttpdns.json")
+    adblock_dat_path = os.path.join(custom_dir, "adblockv2raylite.dat")
+    adlite_json_path = os.path.join(rules_dir, "adlite.json")
     if not offline:
         try:
             print(f"[*] Syncing custom rule: blockhttpdns ...")
@@ -263,6 +327,18 @@ def build_geodata(base_dir: str, offline: bool = False) -> None:
                     f.write(content)
         except Exception as e:
             print(f"[!] Warning: Could not sync remote blockhttpdns.json: {e}")
+
+        try:
+            print(f"[*] Syncing custom rule: adblockv2raylite.dat ...")
+            req = urllib.request.Request(
+                ADBLOCK_DAT_REMOTE_URL, headers={"User-Agent": "HonkGeoDataBuilder/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                content = resp.read()
+                with open(adblock_dat_path, "wb") as f:
+                    f.write(content)
+        except Exception as e:
+            print(f"[!] Warning: Could not sync remote adblockv2raylite.dat: {e}")
 
     # 2. Fetch Upstream geosite-all.dat and geoip.dat
     geosite_fallback = os.path.join(base_dir, "geosite.dat")
@@ -301,6 +377,20 @@ def build_geodata(base_dir: str, offline: bool = False) -> None:
     # 4.5 DOH-CANARY (read from custom/doh-canary.json)
     doh_doms, _ = load_singbox_rule_json(os.path.join(custom_dir, "doh-canary.json"))
     custom_geosite_groups["DOH-CANARY"] = list(dict.fromkeys(doh_doms))
+
+    # 4.6 ADLITE & ADS (8,480 lite adblock rules replacing 102,738 bloated upstream rules)
+    adlite_doms: List[Tuple[int, str]] = []
+    if os.path.exists(adblock_dat_path):
+        print(f"[*] Loading adlite domains from {adblock_dat_path} ...")
+        adlite_doms = load_geosite_dat_domains(adblock_dat_path)
+    elif os.path.exists(adlite_json_path):
+        print(f"[*] Loading adlite domains from {adlite_json_path} ...")
+        adlite_doms, _ = load_singbox_rule_json(adlite_json_path)
+    else:
+        raise FileNotFoundError("Neither adblockv2raylite.dat nor adlite.json found for ADLITE!")
+
+    custom_geosite_groups["ADLITE"] = list(dict.fromkeys(adlite_doms))
+    custom_geosite_groups["ADS"] = list(dict.fromkeys(adlite_doms))
 
     # -----------------------------------------------------------------------
     # 5. Assemble geosite.dat

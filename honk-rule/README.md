@@ -24,11 +24,11 @@
 
 ## 二、规则分类明细（Tag 清单）
 
-### 1. GeoSite 分类（共 29 个唯一分类）
+### 1. GeoSite 分类（共 30 个唯一分类）
 
 | 分类标识 (Tag) | 来源与用途说明 |
 | :--- | :--- |
-| **`ADS`** | 上游去广告集合（100,000+ 条目） |
+| **`ADLITE` / `ADS`** *(精简优化)* | 217heidai 轻量去广告精简规则集（8,480 条目，彻底替换原有 102,738 条臃肿规则，体积削减 40%+） |
 | **`PRIVATE`** | 内网与私有域名直连 |
 | **`CN`** | 国内域名直连集合（100,000+ 条目） |
 | **`APPLE-CN`** | Apple 大陆本地 CDN 加速域名 |
@@ -78,14 +78,14 @@ assets {
 
 ```dae
 # DNS 层
-qname(geosite: ads, geosite: blockhttpdns, geosite: doh-canary) -> reject
+qname(geosite: adlite, geosite: ads, geosite: blockhttpdns, geosite: doh-canary) -> reject
 qname(geosite: private, geosite: cn, geosite: apple-cn, geosite: microsoft-cn, geosite: games-cn) -> alidns
 qname(geosite: webrtc-stun) -> reject
 qname(geosite: youtube, geosite: netflix, geosite: google, geosite: meta, geosite: spotify, geosite: proxy) -> googledns
 
 # Routing 层
 dip(geoip: blockhttpdns) -> block(must)
-domain(geosite: ads, geosite: blockhttpdns, geosite: doh-canary) -> block
+domain(geosite: adlite, geosite: ads, geosite: blockhttpdns, geosite: doh-canary) -> block
 domain(geosite: private, geosite: cn, geosite: apple-cn, geosite: microsoft-cn, geosite: games-cn) -> direct(must)
 domain(geosite: webrtc-stun) -> block
 domain(geosite: youtube, geosite: netflix) -> proxy

@@ -171,7 +171,7 @@ dns {
     routing {
         request {
             # 阻断广告、公共 HttpDNS 以及 Apple DoH Canary 探测
-            qname(geosite: ads, geosite: blockhttpdns, geosite: doh-canary) -> reject
+            qname(geosite: adlite, geosite: ads, geosite: blockhttpdns, geosite: doh-canary) -> reject
             # 屏蔽无用查询类型，显著减少无线广播风暴与空口 RTT 延迟
             qtype(https, svcb, ptr, any) -> reject
             # 阻断 WebRTC STUN 探测，杜绝浏览器通过 UDP 打洞泄露真实家庭出口公网 IP
@@ -227,7 +227,7 @@ routing {
 
     # --- 广告、HttpDNS（41 段公网已知嗅探 IP）与私密转送拦截 ---
     dip(geoip: blockhttpdns) -> block(must)
-    domain(geosite: ads, geosite: blockhttpdns, geosite: doh-canary) -> block
+    domain(geosite: adlite, geosite: ads, geosite: blockhttpdns, geosite: doh-canary) -> block
     dport(993) && dip(geoip: cn) -> block
 
     # --- 自定义直连域名直连放行（根据实际需求配置）---
